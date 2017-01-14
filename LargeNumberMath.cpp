@@ -1,20 +1,101 @@
-#include "LargeMath.h"
-#include <iostream>
-#include <stdlib.h>
-#include <fstream>
-#include <math.h>
-#if 1
-#define NEW new
-#endif
-
-// Useful functions to call:
-//	 cryptolargepair()		- Obtains an encryption code and a decryption code
-//   decryptmessage()	- This will decrypt a message
-//   encryptmessage()		- Returns encrypted message
-
 //  Note that de = Phi*f +1.  This requires de - Phif=1.
 //   This requires de > Phif
 //  
+
+#include<iostream.h>
+#include<stdlib.h>
+#include<fstream.h>
+#include<math.h>
+
+struct numbernode
+{
+	int digit;
+	struct numbernode* next;
+};
+
+struct signednumber
+{
+	struct numbernode* magnitude;
+	int sign;   // sign =-1 or 1
+};
+
+struct divout
+{
+	struct numbernode* quotient;
+	struct numbernode* remainder;
+};
+
+struct leadingstruct
+{
+	int leadingdivisor;
+	int leadingmet;
+};
+
+struct gcmout
+{
+	struct numbernode* number1_multiple_gcm;
+	struct numbernode* number2_multiple_gcm;
+	struct numbernode* gcm;
+};
+
+struct pair
+{
+	struct numbernode *encoder;
+	struct numbernode *decoder;
+};
+
+struct numbernode* deletenumber(struct numbernode* number);
+void printrev (struct numbernode* number);
+struct numbernode* inttonumber (int integer);
+struct numbernode* multiply(struct numbernode* number1, struct numbernode* number2);
+struct signednumber* opposite (struct signednumber* number);
+struct numbernode* copy (struct numbernode* number);
+numbernode* reverse( struct numbernode* list);
+char *stringnum(numbernode* number);
+struct numbernode* greater(struct numbernode* number1, struct numbernode* number2);
+struct numbernode* zeroclean (struct numbernode* number);
+struct signednumber* addsigned(struct signednumber* number1, struct signednumber* number2);
+leadingstruct leading (struct numbernode* divisor, struct numbernode* met);
+struct divout* divide(struct numbernode* dividend, struct numbernode* divisor);
+struct numbernode* apowerbmodc (struct numbernode* a, struct numbernode *b,
+								struct numbernode *c);
+struct gcmout *gcm(numbernode* number1, numbernode* number2);
+struct numbernode *stringtonumber(char *string);
+
+struct pair *board_pair(int board_serial_number, struct numbernode *N,
+								 struct numbernode* prime, 
+								 struct numbernode* another_prime,int number_boards);
+void listpairs(struct numbernode *N, struct numbernode* prime,
+			   struct numbernode* another_prime, int number_boards);
+void encryptmsg(struct numbernode* message, struct numbernode *N, int number_boards);
+struct numbernode* decrypt(struct numbernode *encrypted_message, struct numbernode*N,
+						   int board_serial_number, struct numbernode* prime, 
+								 struct numbernode* another_prime,int number_boards);
+void verify_encrypted(struct numbernode* message, struct numbernode *N, int number_boards);
+
+int main()
+{
+	// N is the modulus used in encrypting messages,
+	//  and the 2 primes composing N are needed.
+	struct numbernode* prime1 = inttonumber(10086767);
+	struct numbernode* prime2 = inttonumber(17344123); // bigger
+	struct numbernode* N = multiply(prime1, prime2);
+
+	// Useful functions to call:
+	//   decrypt()			- This will decrypt a message for a particular board serial #.
+	//   listpairs()		- Outputs decryptor & encryptor values for all boards.
+	//   encryptmsg()		- Lists a message encrypted specially for each board.
+	//   verify_encrypted() - Checks the encryptedmsg list with the decoderlist- does is work?
+
+	int number_boards = 25000;
+	listpairs(N, prime1, prime2, number_boards);
+	char msgstring[16]="120458293847728";
+	struct numbernode* message = stringtonumber(msgstring);
+	encryptmsg(message, N, number_boards);
+	verify_encrypted(message, N, number_boards);
+
+	return(0);
+}
 
 struct numbernode* deletenumber(struct numbernode* number)
 {
@@ -28,35 +109,7 @@ struct numbernode* deletenumber(struct numbernode* number)
 	}
 
 	return (NULL);
-}
 
-struct signednumber* deletesigned(struct signednumber* signednumberin)
-{
-	if (signednumberin==NULL)
-	{
-
-	}
-	else
-	{
-		signednumberin->magnitude = deletenumber(signednumberin->magnitude);
-	}
-	delete signednumberin;
-	return NULL;
-}
-
-struct divout* deletequotient(struct divout* quotient)
-{
-	if (quotient==NULL)
-	{
-		//do nothing
-	}
-	else
-	{
-		deletenumber(quotient->remainder);
-		deletenumber(quotient->quotient);
-		delete quotient;
-	}
-	return NULL;
 }
 
 void printrev (struct numbernode* number)
@@ -64,37 +117,28 @@ void printrev (struct numbernode* number)
 	struct numbernode* current = number;
 	while (current!=NULL)
 	{
-		std::cout << current->digit << " ";
+		cout << current->digit << " ";
 		current=current->next;
 	}
-	std::cout << std::endl;
+	cout << endl;
 	return;
 }
 
-void printfwd (struct numbernode* number)
-{
-	struct numbernode* temp = copy(number);
-	temp = reverse(temp);
-	printrev(temp);
-	temp = deletenumber(temp);
-	return;
-}
-
-struct numbernode* inttonumber (UInt32 integer)
+struct numbernode* inttonumber (int integer)
 {
 	struct numbernode* numberout=NULL;
 	struct numbernode* current;
-	UInt32 reduced = integer;
+	int reduced = integer;
 	if (reduced>0)
 	{
-		numberout=NEW struct numbernode;
+		numberout=new struct numbernode;
 		numberout->digit=reduced%10;
 		numberout->next=NULL;
 		reduced=reduced/10;
 		current = numberout;
 		while (reduced>0)
 		{
-			current->next = NEW struct numbernode;
+			current->next = new struct numbernode;
 			current = current->next;
 			current->digit = reduced%10;
 			current->next = NULL;
@@ -108,9 +152,9 @@ struct numbernode* inttonumber (UInt32 integer)
 struct numbernode* multiply(struct numbernode* number1, struct numbernode* number2)
 {
 	// accomodate apowerbmodc:
-	//  - doubler in apowerbmodc can be zero, as the second argument.
-	//	- it can be divide's remainder which can be zero
-	//  which means: NULL
+	//    - doubler in apowerbmodc can be zero, as the second argument.
+	//			- it can be divide's remainder which can be zero
+				//  which means: NULL
 	struct numbernode* t1;
 	if (number1==NULL || number2==NULL)
 	{
@@ -121,8 +165,8 @@ struct numbernode* multiply(struct numbernode* number1, struct numbernode* numbe
 		struct numbernode* answer;
 		struct numbernode* runner1;
 		struct numbernode* runner2;
-		SInt32 ones;
-		SInt32 carry;
+		int ones;
+		int carry;
 		struct numbernode* addzeroposition;
 		struct numbernode* addposition;
 
@@ -130,8 +174,7 @@ struct numbernode* multiply(struct numbernode* number1, struct numbernode* numbe
 		if (number2->digit==0)
 		{
 			t1=NULL;
-			// NNN
-			t1=NEW struct numbernode;
+			t1=new struct numbernode;
 			answer =t1;
 			answer->digit=0;
 			answer->next=NULL;
@@ -140,8 +183,7 @@ struct numbernode* multiply(struct numbernode* number1, struct numbernode* numbe
 		{
 			runner1=number1;
 			t1=NULL;
-			// NNN
-			t1=NEW struct numbernode;
+			t1=new struct numbernode;
 			answer=t1;
 			ones = (runner1->digit*number2->digit)%10;
 			carry = (runner1->digit*number2->digit)/10;
@@ -152,8 +194,7 @@ struct numbernode* multiply(struct numbernode* number1, struct numbernode* numbe
 			{
 				runner1=runner1->next;
 				t1=NULL;
-				// NNN
-				t1=NEW struct numbernode;
+				t1=new struct numbernode;
 				addposition->next=t1;
 				addposition=addposition->next;
 				ones = (carry + runner1->digit*number2->digit)%10;
@@ -165,8 +206,7 @@ struct numbernode* multiply(struct numbernode* number1, struct numbernode* numbe
 			if (carry!=0)
 			{
 				t1=NULL;
-				// NNN
-				t1 = NEW struct numbernode;
+				t1 = new struct numbernode;
 				addposition->next=t1;
 				addposition = addposition->next;
 				addposition->digit=carry;
@@ -181,8 +221,7 @@ struct numbernode* multiply(struct numbernode* number1, struct numbernode* numbe
 			if (answer->next==NULL)
 			{
 				t1=NULL;
-				// NNN
-				t1=NEW struct numbernode;
+				t1=new struct numbernode;
 				answer->next=t1;
 				answer->next->digit=0;
 				answer->next->next=NULL;
@@ -199,8 +238,7 @@ struct numbernode* multiply(struct numbernode* number1, struct numbernode* numbe
 				if (addzeroposition->next==NULL)
 				{
 					t1=NULL;
-					// NNN
-					t1= NEW struct numbernode;
+					t1= new struct numbernode;
 					addzeroposition->next=t1; 
 					addzeroposition=addzeroposition->next;
 					addzeroposition->digit=0;
@@ -224,8 +262,7 @@ struct numbernode* multiply(struct numbernode* number1, struct numbernode* numbe
 				if (addposition->next == NULL)
 				{
 					t1=NULL;
-					// NNN
-					t1=NEW struct numbernode;
+					t1=new struct numbernode;
 					addposition->next=t1;
 					addposition->next->digit=0;
 					addposition->next->next=NULL;
@@ -238,12 +275,11 @@ struct numbernode* multiply(struct numbernode* number1, struct numbernode* numbe
 			}
 			if (carry!=0)
 			{
-				if (addposition->next==NULL) // if ->next is unset to NULL after a NEW struct,
+				if (addposition->next==NULL) // if ->next is unset to NULL after a new struct,
 											// then this gets missed and a crash occurs below.
 				{
 					t1=NULL;
-					// NNN
-					t1 = NEW struct numbernode;
+					t1 = new struct numbernode;
 					addposition->next =t1;
 					addposition->next->digit=0;
 					addposition->next->next = NULL;
@@ -256,8 +292,7 @@ struct numbernode* multiply(struct numbernode* number1, struct numbernode* numbe
 				if (carry!=0)
 				{
 					t1=NULL;
-					// NNN
-					t1 = NEW struct numbernode;
+					t1 = new struct numbernode;
 					addposition->next =t1;
 					addposition=addposition->next;
 					addposition->digit=carry;
@@ -272,8 +307,7 @@ struct numbernode* multiply(struct numbernode* number1, struct numbernode* numbe
 				if (addzeroposition->next==NULL)
 				{
  					t1=NULL;
-					// NNN
-					t1= NEW struct numbernode;
+					t1= new struct numbernode;
 					addzeroposition->next=t1; 
 					addzeroposition=addzeroposition->next;
 					addzeroposition->digit=0;
@@ -301,21 +335,19 @@ struct numbernode* copy (struct numbernode* number)
 	struct numbernode* currentcopy;
 	if (number!=NULL)
 	{
-		replica = NEW struct numbernode;
 		current=number;
+		replica = new struct numbernode;
+		replica->digit=number->digit;
+		replica->next=NULL;
 		currentcopy=replica;
-		currentcopy->digit=number->digit;
-		currentcopy->next=NULL;
 		while (current->next!=NULL)
 		{
+			current=current->next;
 			t1=NULL;
-			t1= NEW struct numbernode;
+			t1= new struct numbernode;
 			currentcopy->next=t1;
-
-			current = current->next;
 			currentcopy = currentcopy->next;
-			
-			currentcopy->digit = current->digit;
+			currentcopy->digit=current->digit;
 			currentcopy->next=NULL;
 		}
 	}
@@ -344,37 +376,15 @@ struct numbernode* reverse( struct numbernode* list)
 	return(newhead);
 }
 
-UInt32 intnum(numbernode* number)
-{
-	UInt32 integer=0;
-	if (number==NULL) integer = 0;
-	else
-	{
-		struct numbernode* number2 = copy(number);
-		number2=reverse(number2);
-		UInt32 count=0;
-		struct numbernode* current = number2;
-		while(current!=NULL)
-		{
-			integer = integer*10;
-			integer = integer+current->digit;
-			count++;
-			current=current->next;
-		}
-		number2=deletenumber(number2);
-	}
-	return (integer);
-}
-
 char *stringnum(numbernode* number)
 {
-	char* string= NEW char[200];
-	if (number==NULL) string[0]='\0';
+	char* string= new char[200];
+	if (number==NULL) string[0]=NULL;
 	else
 	{
 		struct numbernode* number2 = copy(number);
 		number2=reverse(number2);
-		SInt32 count=0;
+		int count=0;
 		struct numbernode* current = number2;
 		while(current!=NULL)
 		{
@@ -387,7 +397,8 @@ char *stringnum(numbernode* number)
 	}
 	return (string);
 }
-struct numbernode* numnodegreater(struct numbernode* number1, struct numbernode* number2)
+
+struct numbernode* greater(struct numbernode* number1, struct numbernode* number2)
 {
 	struct numbernode* greatermag;
 	if (number1==NULL&&number2==NULL)
@@ -412,7 +423,7 @@ struct numbernode* numnodegreater(struct numbernode* number1, struct numbernode*
 			greatermag=number1;
 		else // Same # of digits so must compare:
 		{
-			// if only one digit in length:
+			// if only one digit long:
 
 			struct numbernode* copy1 = copy(number1);
 			struct numbernode* copy2 = copy(number2);
@@ -463,7 +474,7 @@ struct numbernode* zeroclean (struct numbernode* number)
 	if (number!=NULL)
 	{
 		t1=NULL;
-		t1= NEW struct numbernode;
+		t1= new struct numbernode;
 		newnumber=t1;
 		newnumber->digit=number->digit;
 		newnumber->next = NULL;
@@ -485,7 +496,7 @@ struct numbernode* zeroclean (struct numbernode* number)
 			{
 				currentold=currentold->next;
 				t1=NULL;
-				t1 =NEW struct numbernode;
+				t1 =new struct numbernode;
 				currentnew->next=t1;
 				currentnew=currentnew->next;
 				currentnew->digit=currentold->digit;
@@ -500,8 +511,8 @@ struct numbernode* zeroclean (struct numbernode* number)
 struct signednumber* addsigned(struct signednumber* number1, struct signednumber* number2)
 {
 	struct numbernode *t1;
-	SInt32 carry, ones;
-	struct signednumber * answer=NEW struct signednumber;
+	int carry, ones;
+	struct signednumber * answer=new struct signednumber;
 
 	if (number1->magnitude==NULL && number2->magnitude==NULL)
 	{
@@ -534,21 +545,20 @@ struct signednumber* addsigned(struct signednumber* number1, struct signednumber
 			ones = (current1->digit+current2->digit)%10;
 			carry= (current1->digit+current2->digit)/10;
 			t1=NULL;
-			t1=NEW struct numbernode;
+			t1=new struct numbernode;
 			answer->magnitude =t1;
-			carryanswer=answer->magnitude;
-			carryanswer->digit=ones;
-			carryanswer->next=NULL;
+			answer->magnitude->digit=ones;
+			answer->magnitude->next=NULL;
 			current1=current1->next;
 			current2=current2->next;
-
+			carryanswer=answer->magnitude;
 			//deal with multiple digit terms
 			if (current1!=NULL||current2!=NULL)
 			{
 				while (current1!=NULL&&current2!=NULL)
 				{
 					t1=NULL;
-					t1= NEW struct numbernode;
+					t1= new struct numbernode;
 					carryanswer->next=t1; 
 					carryanswer=carryanswer->next;
 					ones=(carry+current1->digit+current2->digit)%10;
@@ -569,7 +579,7 @@ struct signednumber* addsigned(struct signednumber* number1, struct signednumber
 					//do first digit:
 					ones = (carry+carryextra->digit)%10;
 					carry = (carry+carryextra->digit)/10;
-					t1=NEW struct numbernode;
+					t1=new struct numbernode;
 					carryanswer->next=t1;
 					carryanswer=carryanswer->next;
 					carryanswer->digit=ones;
@@ -581,7 +591,7 @@ struct signednumber* addsigned(struct signednumber* number1, struct signednumber
 						ones = (carry+carryextra->digit)%10;
 						carry = (carry+carryextra->digit)/10;
 						t1=NULL;
-						t1= NEW struct numbernode;
+						t1= new struct numbernode;
 						carryanswer->next=t1; 
 						carryanswer=carryanswer->next;
 						carryanswer->digit=ones;
@@ -594,7 +604,7 @@ struct signednumber* addsigned(struct signednumber* number1, struct signednumber
 				{
 					//digit+carry (carry <=1) = 9+1 max implies carry<=1.
 					t1=NULL;
-					t1=NEW struct numbernode;
+					t1=new struct numbernode;
 					carryanswer->next=t1;
 					carryanswer=carryanswer->next;
 					carryanswer->digit=1; // (carry must = 1)
@@ -607,7 +617,7 @@ struct signednumber* addsigned(struct signednumber* number1, struct signednumber
 				if (carry>0)
 				{
 					t1=NULL;
-					t1=NEW struct numbernode;
+					t1=new struct numbernode;
 					carryanswer->next=t1;
 					carryanswer=carryanswer->next;
 					carryanswer->digit=1; // (carry must = 1)
@@ -619,14 +629,14 @@ struct signednumber* addsigned(struct signednumber* number1, struct signednumber
 		else // number1->sign is opposite number2->sign:
 		{
 			struct numbernode* smallnumber;
-			struct numbernode * bignumber=numnodegreater(number1->magnitude, number2->magnitude);
+			struct numbernode * bignumber=greater(number1->magnitude, number2->magnitude);
 			if (bignumber==NULL) // if equal in magnitude
 			{
 				answer->magnitude=NULL;
 			}
 			else
 			{
-				SInt32 borrow, major, smallerterm, oldborrow;
+				int borrow, major, smallerterm, oldborrow;
 				if (bignumber==number1->magnitude)
 				{
 					smallnumber=number2->magnitude;
@@ -641,7 +651,7 @@ struct signednumber* addsigned(struct signednumber* number1, struct signednumber
 				//Compute answer magnitude:
 				//Do first digit.
 				t1=NULL;
-				t1=NEW struct numbernode;
+				t1=new struct numbernode;
 				answer->magnitude =t1;
 				borrow=0; 
 				major=bignumber->digit;
@@ -683,7 +693,7 @@ struct signednumber* addsigned(struct signednumber* number1, struct signednumber
 						major=currentbig->digit-oldborrow;
 					}
 					t1=NULL;
-					t1=NEW struct numbernode;
+					t1=new struct numbernode;
 					currentanswer->next=t1;
 					currentanswer=currentanswer->next;
 					currentanswer->digit=major-smallerterm;
@@ -704,13 +714,13 @@ leadingstruct leading (struct numbernode* divisor, struct numbernode* met)
 	// or it gives one or two digits of divisor and gives all of met.
 
 	struct leadingstruct answer;
-	SInt32 divcount = 0;
+	int divcount = 0;
 	struct numbernode* currentdivisor=divisor;
 	struct numbernode* currentmet;
 	divcount++;
-	SInt32 magnitude;
-	SInt32 chop=0;
-	SInt32 waschopped=0;
+	int magnitude;
+	int chop=0;
+	int waschopped=0;
 	while(currentdivisor->next!=NULL)
 	{
 		divcount++;
@@ -759,7 +769,7 @@ struct divout* divide(struct numbernode* dividend, struct numbernode* divisor)
 	struct numbernode* t1;
 	// Note EX: if 230/23 or 0/23 then remainder is NULL.
 
-	struct divout* answer = NEW struct divout;
+	struct divout* answer = new struct divout;
 	// Assumes that divisor > 0.
 
 
@@ -768,7 +778,7 @@ struct divout* divide(struct numbernode* dividend, struct numbernode* divisor)
   	struct numbernode* temp2;
 
 	// create met if quotient>0
-	if (numnodegreater(divisor,dividend)==divisor)
+	if (greater(divisor,dividend)==divisor)
 	{
 		answer->quotient=NULL;
 		answer->remainder=copy(dividend);
@@ -788,17 +798,17 @@ struct divout* divide(struct numbernode* dividend, struct numbernode* divisor)
 			// is then called untoucheddividend.
 		struct numbernode* numtemp;
 
-		SInt32 k;
+		int k;
 		struct signednumber* subresult, *sub1, *sub2;
 		struct numbernode* quotientcurrent;
 
 		// build met until it is >= divisor	 aka while divisor > met keep building met.
 		
-		while (numnodegreater(divisor, met)==divisor)
+		while (greater(divisor, met)==divisor)
 		{	// build met by inserting before its first digit.
 			if (met==NULL)
 			{
-				  met= NEW struct numbernode;
+				  met= new struct numbernode;
 				  met->digit = untoucheddividend->digit;
 				  met->next=NULL;
 				  untoucheddividend=untoucheddividend->next;
@@ -806,7 +816,7 @@ struct divout* divide(struct numbernode* dividend, struct numbernode* divisor)
 			else
 			{
 				numtemp = met;
-				met = NEW struct numbernode;
+				met = new struct numbernode;
 				met->digit = untoucheddividend->digit;
 				met->next = numtemp;
 				untoucheddividend=untoucheddividend->next;
@@ -820,7 +830,7 @@ struct divout* divide(struct numbernode* dividend, struct numbernode* divisor)
 		temp1= inttonumber(k+1);
 		product = multiply(temp1, divisor);
 		temp1=deletenumber(temp1);
-		temp2= numnodegreater(product, met);
+		temp2= greater(product, met);
 		product=deletenumber(product);
 		while (temp2==met||// if (K+1)*divisor <=met
 				temp2==NULL)
@@ -830,13 +840,13 @@ struct divout* divide(struct numbernode* dividend, struct numbernode* divisor)
 				temp1= inttonumber(k+1);
 				product = multiply(temp1, divisor);
 				temp1=deletenumber(temp1);
-				temp2= numnodegreater(product, met);
+				temp2= greater(product, met);
 				product=deletenumber(product);
 		}
-		sub1 = NEW struct signednumber;
+		sub1 = new struct signednumber;
 		sub1->sign=1;
 		sub1->magnitude=met;
-		sub2 = NEW struct signednumber;
+		sub2 = new struct signednumber;
 		sub2->sign=-1;
 		temp1=inttonumber(k);
 		sub2->magnitude=multiply(temp1,divisor);
@@ -850,7 +860,7 @@ struct divout* divide(struct numbernode* dividend, struct numbernode* divisor)
 		delete subresult;
 
 		t1=NULL;
-		t1= NEW struct numbernode;
+		t1= new struct numbernode;
 		answer->quotient=t1; 
 		answer->quotient->digit = k;
 		answer->quotient->next = NULL;
@@ -866,7 +876,7 @@ struct divout* divide(struct numbernode* dividend, struct numbernode* divisor)
 			{
 				  if (untoucheddividend->digit!=0)
 				  {
-					  met = NEW struct numbernode;
+					  met = new struct numbernode;
 					  met->digit = untoucheddividend->digit;
 					  met->next=NULL;
 					  untoucheddividend=untoucheddividend->next;
@@ -877,7 +887,7 @@ struct divout* divide(struct numbernode* dividend, struct numbernode* divisor)
 			else
 			{
 				numtemp = met;
-				met = NEW struct numbernode;
+				met = new struct numbernode;
 				met->digit = untoucheddividend->digit;
 				met->next = numtemp;
 				untoucheddividend=untoucheddividend->next;
@@ -889,14 +899,14 @@ struct divout* divide(struct numbernode* dividend, struct numbernode* divisor)
 			// determine k=met/divisor and met=met%divisor:
 			leaders=leading(divisor,met);
 			k = leaders.leadingmet/leaders.leadingdivisor; // met rounded down / divisor rounded up		
-			//std::cout << "lead met was " <<leaders.leadingmet << std::endl;
-			//std::cout << "Lead divisor was " <<leaders.leadingdivisor << std::endl;
-			//std::cout << "k estimate was " << k << std::endl;
+			//cout << "lead met was " <<leaders.leadingmet << endl;
+			//cout << "Lead divisor was " <<leaders.leadingdivisor << endl;
+			//cout << "k estimate was " << k << endl;
 		
 			temp1= inttonumber(k+1);
 			product = multiply(temp1, divisor);
 			temp1=deletenumber(temp1);
-			temp2= numnodegreater(product, met);
+			temp2= greater(product, met);
 			product=deletenumber(product);
 			while (temp2==met||// if (K+1)*divisor <=met
 					temp2==NULL)
@@ -906,7 +916,7 @@ struct divout* divide(struct numbernode* dividend, struct numbernode* divisor)
 					temp1= inttonumber(k+1);
 					product = multiply(temp1, divisor);
 					temp1=deletenumber(temp1);
-					temp2= numnodegreater(product, met);
+					temp2= greater(product, met);
 					product=deletenumber(product);
 			}
 						
@@ -916,10 +926,10 @@ struct divout* divide(struct numbernode* dividend, struct numbernode* divisor)
 			}
 			else
 			{
-				sub1 = NEW struct signednumber;
+				sub1 = new struct signednumber;
 				sub1->sign=1;
 				sub1->magnitude=met;
-				sub2 = NEW struct signednumber;
+				sub2 = new struct signednumber;
 				sub2->sign=-1;
 				temp1=inttonumber(k);				
 				sub2->magnitude=multiply(temp1,divisor);
@@ -927,10 +937,7 @@ struct divout* divide(struct numbernode* dividend, struct numbernode* divisor)
 				subresult=addsigned(sub1, sub2);
 				sub1->magnitude=sub1->magnitude=deletenumber(sub1->magnitude);
 				deletenumber(sub2->magnitude);
-				if (subresult->sign == - 1)
-				{
-					//std::cout << "Bad sign in subtract" << std::endl;
-				}
+				if (subresult->sign == - 1) cout << "Bad sign in subtract" << endl;
 				delete sub1;
 				delete sub2;
 
@@ -939,7 +946,7 @@ struct divout* divide(struct numbernode* dividend, struct numbernode* divisor)
 			}
 
 			t1=NULL;
-			t1 = NEW struct numbernode;
+			t1 = new struct numbernode;
 			quotientcurrent->next=t1;
 			quotientcurrent=quotientcurrent->next;
 			quotientcurrent->digit = k;
@@ -1017,15 +1024,15 @@ struct numbernode* apowerbmodc (struct numbernode* a, struct numbernode *b,
 
 struct gcmout *gcm(numbernode* number1, numbernode* number2)
 {
-	struct gcmout * gcmreturn  = NEW struct gcmout;
+	struct gcmout * gcmreturn  = new struct gcmout;
 
 	struct numbernode* a, *b;
-	SInt32 flip;
+	int flip;
 
 	struct signednumber* atemp1, *atemp2, *atemp3;
 	struct numbernode* temp1;
 
-	if (numnodegreater(number1, number2)==number2)
+	if (greater(number1, number2)==number2)
 	{
 		a=number2;
 		b=number1;
@@ -1041,27 +1048,27 @@ struct gcmout *gcm(numbernode* number1, numbernode* number2)
 	struct signednumber *an1, *bn1, *an2, *bn2, *an3, *bn3;
 	struct divout *divtemp;
 
-	SInt32 notthrough = (numnodegreater(a,b)!=NULL);
-	an1 = NEW struct signednumber;
+	int notthrough = (greater(a,b)!=NULL);
+	an1 = new struct signednumber;
 	an1->magnitude=inttonumber(1);
 	an1->sign = 1;
-	bn1 = NEW struct signednumber;
+	bn1 = new struct signednumber;
 	bn1->magnitude=NULL;
 	bn1->sign = 1;
-	an2 = NEW struct signednumber;
+	an2 = new struct signednumber;
 	an2->magnitude = NULL;
 	an2->sign=1;
-	bn2 = NEW struct signednumber;
+	bn2 = new struct signednumber;
 	bn2->magnitude = inttonumber(1);
 	bn2->sign=1;
 	struct numbernode* v1, *v2;
 	struct numbernode * oldremainder = NULL;
 	while(notthrough)
 	{
-		atemp1 = NEW struct signednumber;
+		atemp1 = new struct signednumber;
 		atemp1->sign = an1->sign;
 		atemp1->magnitude= multiply(an1->magnitude, a);
-		atemp2 = NEW struct signednumber;
+		atemp2 = new struct signednumber;
 		atemp2->sign = bn1->sign;
 		atemp2->magnitude = multiply(bn1->magnitude, b);
 		atemp3 = addsigned(atemp1, atemp2);	// need addsigned to add 0 if needed.
@@ -1072,10 +1079,10 @@ struct gcmout *gcm(numbernode* number1, numbernode* number2)
 		v1 = atemp3->magnitude; // Assume that v1 is positive, because it must be.
 		delete atemp3;
 
-		atemp1 = NEW struct signednumber;
+		atemp1 = new struct signednumber;
 		atemp1->sign=an2->sign;
 		atemp1->magnitude= multiply(an2->magnitude, a);
-		atemp2 = NEW struct signednumber;
+		atemp2 = new struct signednumber;
 		atemp2->sign = bn2->sign;
 		atemp2->magnitude = multiply(bn2->magnitude, b);
 		atemp3 = addsigned(atemp1, atemp2);
@@ -1111,15 +1118,15 @@ struct gcmout *gcm(numbernode* number1, numbernode* number2)
 		else
 		{
 			// an3 = an1-k*an2:
-			atemp1 = NEW struct signednumber;
+			atemp1 = new struct signednumber;
 			atemp1->sign = an1->sign;
 			atemp1->magnitude=an1->magnitude;
-			atemp2 = NEW struct signednumber;
+			atemp2 = new struct signednumber;
 			atemp2->sign = -1*(an2->sign);
 			temp1 = multiply(divtemp->quotient,an2->magnitude);
 			atemp2->magnitude=temp1;
 			atemp3 = addsigned(atemp1, atemp2);
-			an3 = NEW struct signednumber;
+			an3 = new struct signednumber;
 			an3->magnitude = atemp3->magnitude;
 			an3->sign=atemp3->sign;
 			temp1=deletenumber(temp1);
@@ -1128,15 +1135,15 @@ struct gcmout *gcm(numbernode* number1, numbernode* number2)
 			delete atemp3;
 
 			// bn3 = bn1-k*bn2;
-			atemp1 = NEW struct signednumber;
+			atemp1 = new struct signednumber;
 			atemp1->sign = bn1->sign;
 			atemp1->magnitude=bn1->magnitude;
-			atemp2 = NEW struct signednumber;
+			atemp2 = new struct signednumber;
 			atemp2->sign = -1*(bn2->sign);
 			temp1 = multiply(divtemp->quotient, bn2->magnitude);
 			atemp2->magnitude=temp1;
 			atemp3 = addsigned(atemp1, atemp2);
-			bn3 = NEW struct signednumber;
+			bn3 = new struct signednumber;
 			bn3->magnitude= atemp3->magnitude;   
 			bn3->sign = atemp3->sign;
 			temp1=deletenumber(temp1);
@@ -1183,12 +1190,12 @@ struct gcmout *gcm(numbernode* number1, numbernode* number2)
 struct numbernode *stringtonumber(char *string)
 {
 	struct numbernode *t1;
-	SInt32 i;
+	int i;
 	numbernode* newnumber = NULL;
 	numbernode* current;
 	if (string[0]!='\0')
 	{
-		t1= NEW struct numbernode;
+		t1= new struct numbernode;
 		newnumber=t1; 
 		newnumber->digit=string[0]-48;
 		newnumber->next=NULL;
@@ -1196,7 +1203,7 @@ struct numbernode *stringtonumber(char *string)
 		i=1;
 		while (string[i]!='\0')
 		{
-			t1 = NEW struct numbernode;
+			t1 = new struct numbernode;
 			current->next=t1;
 			current=current->next;
 			current->digit=string[i]-48;
@@ -1208,24 +1215,30 @@ struct numbernode *stringtonumber(char *string)
 	return newnumber;
 }
 
-struct largepair *cryptolargepair(struct numbernode *N,
-						struct numbernode* prime, 
-						struct numbernode* another_prime,
-						struct numbernode* searchpoint)
+struct pair *board_pair(int board_serial_number, struct numbernode *N,
+								 struct numbernode* prime, 
+								 struct numbernode* another_prime,int number_boards)
 {
-	SInt32 number_boards = 25000;
-//	SInt32 board_serial_number = 0;
-	struct largepair *the_largepair;  // the encoder/decoder largepair for this board.
+	// There are number_boards evenly distributed points < PhiN.
+	// This function guesses along a line of evenly distributed points.
+	// Then it finds the next available relativeprime to PhiN, counting
+	// upwards until one is found.  This way the list of decoders need not
+	// be stored in the installer.  Rather, this very same algorithm will
+	// be used in the installer.
+	//
+	// The guess for the encoder is= .1 PhiN + .8 PhiN * (board_serial_number/number_boards).
+
+	struct pair *the_pair;  // the encoder/decoder pair for this board.
 	struct numbernode* number_boardsl=inttonumber(number_boards);
 	struct numbernode* one = inttonumber(1);
 
 	//produce Phi of N, the # of numbers less than N which are relatively prime to N:
 	struct numbernode* temp1;
 	struct signednumber* atemp1, *atemp2, *atemp3;
-	atemp1 = NEW struct signednumber;
+	atemp1 = new struct signednumber;
 	atemp1->sign = 1;
 	atemp1->magnitude = N;
-	atemp2 = NEW struct signednumber;
+	atemp2 = new struct signednumber;
 	atemp2->sign = -1;
 	atemp2->magnitude = prime;
 	atemp3 = addsigned(atemp1, atemp2);
@@ -1233,7 +1246,7 @@ struct largepair *cryptolargepair(struct numbernode *N,
 	delete atemp2;
 	// assume that N>prime1 so sign is +.
 	// Now subtract prime2 from atemp3:
-	atemp1= NEW struct signednumber;
+	atemp1= new struct signednumber;
 	atemp1->sign=-1;
 	atemp1->magnitude=another_prime;
 	atemp2=addsigned(atemp3, atemp1);
@@ -1241,7 +1254,7 @@ struct largepair *cryptolargepair(struct numbernode *N,
 	delete atemp3;
 	temp1 = inttonumber(1);
 	// Now add 1,  ; assume N-prime1-prime2>=0.
-	atemp1= NEW struct signednumber;
+	atemp1= new struct signednumber;
 	atemp1->sign = 1;
 	atemp1->magnitude= temp1;
 	atemp3 = addsigned(atemp2, atemp1);
@@ -1253,7 +1266,7 @@ struct largepair *cryptolargepair(struct numbernode *N,
 	
 	struct divout *dftemp1;
 	struct signednumber *aftemp1, *aftemp2, *aftemp3;
-	struct numbernode* ftemp1, *ftemp2, *ftemp5;
+	struct numbernode* ftemp1, *ftemp2, *ftemp3, *ftemp4, *ftemp5;
 	struct numbernode* encoder_candidate;
 	struct numbernode *decoder;
 	struct gcmout *PhiNRelativePrimeCK;
@@ -1278,22 +1291,46 @@ struct largepair *cryptolargepair(struct numbernode *N,
 	// ftemp1 holds 0.8*PhiN
 	// ftemp2 holds 0.1*PhiN
 
-//	SInt32 f = board_serial_number;
-	SInt32 is_valid;
+	int f = board_serial_number;
+	int is_valid;
 	struct signednumber *ss1, *ss2, *ss3;
 	
 	{
-		encoder_candidate= copy(searchpoint);
-				
+		// Guess at #f by 0.1*PhiN+(f/number_boards)*(0.8*PhiN),
+		//   then count upward until a number is found which is relatively prime to PhiN.
+		ftemp3 = inttonumber(f);
+		ftemp4 = multiply(ftemp3,ftemp1);
+		ftemp3=deletenumber(ftemp3);
+		dftemp1=divide(ftemp4,number_boardsl);
+		ftemp3=dftemp1->quotient;
+		dftemp1->remainder=deletenumber(dftemp1->remainder);
+		delete dftemp1;
+		ftemp4=deletenumber(ftemp4);
+		// ftemp3 holds f/number_boards*0.8*PhiN
+
+		aftemp1 = new struct signednumber;
+		aftemp1->sign = 1;
+		aftemp1->magnitude = ftemp2;
+		aftemp2 = new struct signednumber;
+		aftemp2->sign = 1;
+		aftemp2->magnitude = ftemp3;
+		aftemp3 = addsigned(aftemp1, aftemp2);
+		encoder_candidate=aftemp3->magnitude;
+		delete aftemp1;
+		delete aftemp2;
+		ftemp3=deletenumber(ftemp3);
+
+		delete aftemp3;
+
 		// Check encoder candidate
 		is_valid=0;
 		PhiNRelativePrimeCK = gcm(PhiN, encoder_candidate);
-		if (numnodegreater(PhiNRelativePrimeCK->gcm, one)==NULL)
+		if (greater(PhiNRelativePrimeCK->gcm, one)==NULL)
 		{
-			ss1 = NEW struct signednumber;
+			ss1 = new struct signednumber;
 			ss1->sign=1;
 			ss1->magnitude=multiply(PhiNRelativePrimeCK->number1_multiple_gcm, PhiN);
-			ss2 = NEW struct signednumber;
+			ss2 = new struct signednumber;
 			ss2->sign=-1;
 			ss2->magnitude=multiply(PhiNRelativePrimeCK->number2_multiple_gcm, encoder_candidate);
 			ss3 = addsigned(ss1, ss2);
@@ -1317,10 +1354,10 @@ struct largepair *cryptolargepair(struct numbernode *N,
 		while (!is_valid)
 		{
 			// Increment candidate, check again.
-			aftemp1= NEW struct signednumber;
+			aftemp1= new struct signednumber;
 			aftemp1->sign = 1;
 			aftemp1->magnitude = encoder_candidate;
-			aftemp2 = NEW struct signednumber;
+			aftemp2 = new struct signednumber;
 			aftemp2->sign = 1;
 			aftemp2->magnitude = one;
 			aftemp3 = addsigned(aftemp1, aftemp2);
@@ -1331,12 +1368,12 @@ struct largepair *cryptolargepair(struct numbernode *N,
 			delete aftemp3;
 
 			PhiNRelativePrimeCK = gcm(PhiN, encoder_candidate);
-			if (numnodegreater(PhiNRelativePrimeCK->gcm, one)==NULL)
+			if (greater(PhiNRelativePrimeCK->gcm, one)==NULL)
 			{
-				ss1 = NEW struct signednumber;
+				ss1 = new struct signednumber;
 				ss1->sign=1;
 				ss1->magnitude=multiply(PhiNRelativePrimeCK->number1_multiple_gcm, PhiN);
-				ss2 = NEW struct signednumber;
+				ss2 = new struct signednumber;
 				ss2->sign=-1;
 				ss2->magnitude=multiply(PhiNRelativePrimeCK->number2_multiple_gcm, encoder_candidate);
 				ss3 = addsigned(ss1, ss2);
@@ -1359,12 +1396,14 @@ struct largepair *cryptolargepair(struct numbernode *N,
 			delete PhiNRelativePrimeCK;
 		}
 
-		the_largepair = NEW struct largepair;
+		the_pair = new struct pair;
 		
-		the_largepair->encoder=copy(encoder_candidate);
+		encoder_candidate=reverse(encoder_candidate);
+		the_pair->encoder=copy(encoder_candidate);
 		encoder_candidate=deletenumber(encoder_candidate);
 
-		the_largepair->decoder=copy(decoder);	
+		decoder=reverse(decoder);
+		the_pair->decoder=copy(decoder);	
 		decoder=deletenumber(decoder);
 	}
 	ftemp1=deletenumber(ftemp1);
@@ -1373,21 +1412,143 @@ struct largepair *cryptolargepair(struct numbernode *N,
 	number_boardsl=deletenumber(number_boardsl);
 	PhiN = deletenumber(PhiN);
 
-	return(the_largepair);
+	return(the_pair);
 }
 
+void listpairs(struct numbernode *N, struct numbernode* prime,
+			   struct numbernode* another_prime, int number_boards)
+{		
+	numbernode *fcurrent;
+	ofstream myfiled("decoderlist", ios::out);
+	ofstream myfilee("encoderlist", ios::out);
+	struct pair *apair;
+	int f;
+	for (f=0;f<number_boards;f++)
+	{
+		apair=board_pair(f, N, prime, another_prime, number_boards);
 
-struct numbernode* encryptmessage(struct numbernode* message, struct numbernode* fencoder, struct numbernode *N)
-{
+   		fcurrent=apair->decoder;
+		while (fcurrent!=NULL)
+		{
+			myfiled<<fcurrent->digit;
+			fcurrent=fcurrent->next;
+		}
+		myfiled << endl;
 
-	struct numbernode *fproduct1;
+		fcurrent=apair->encoder;
+		while (fcurrent!=NULL)
+		{
+			myfilee << fcurrent->digit;
+			fcurrent=fcurrent->next;
+		}
+		myfilee << endl;
 
-	fproduct1 = apowerbmodc(message, fencoder, N);
-	return fproduct1;
+		cout << "done with listing pair " << f << endl;
+		apair->decoder=deletenumber(apair->decoder);
+		apair->encoder=deletenumber(apair->encoder);
+		delete apair;
+	}
+	myfiled.close();
+	myfilee.close();
+	return;
 }
 
-struct numbernode* decryptmessage(struct numbernode* encodedmsg, struct numbernode* decoder, struct numbernode *N)
+void encryptmsg(struct numbernode* message, struct numbernode *N, int number_boards)
 {
-	struct numbernode* product = apowerbmodc(encodedmsg, decoder, N);		
-	return product; // decrypted form 
+	// Use encoderlist to encrypt the message out to a file, for all the boards.
+	ifstream encoderlist("encoderlist", ios::in);
+	ofstream encryptedmsg("encryptedmsg", ios::out);
+
+	char fnumber[16];  // all numbers are 15 digits or less.
+	struct numbernode *fencoder, *fproduct1;
+	char * charp;
+	int j, k;
+
+	// Encrypt the message with the encoders for all the boards.
+	for (k=0; k<number_boards; k++)
+	{
+		j=0;
+		while(encoderlist.get(fnumber[j])&&fnumber[j]!=10)
+			j++;
+		fnumber[j]='\0';
+		fencoder=stringtonumber(fnumber);
+
+		fproduct1 = apowerbmodc(message, fencoder, N);
+		charp = stringnum(fproduct1);
+		encryptedmsg << charp << endl;
+		delete [] charp;
+		fproduct1=deletenumber(fproduct1);
+
+		fencoder=deletenumber(fencoder);
+		cout << "done encrypting for board " << k << endl;
+	}
+	return;
+}
+
+struct numbernode* decrypt(struct numbernode *encrypted_message, struct numbernode*N,
+						   int board_serial_number, struct numbernode* prime, 
+								 struct numbernode* another_prime,int number_boards)
+{
+	struct numbernode* product;
+	struct numbernode* decoder;
+	struct pair* this_pair=
+		board_pair( board_serial_number, N, prime, another_prime, number_boards);
+	decoder = this_pair->decoder;
+	this_pair->encoder=deletenumber(this_pair->encoder);
+	delete this_pair;
+	product = apowerbmodc(encrypted_message, decoder, N);
+	return (product);
+}
+
+void verify_encrypted(struct numbernode* message, struct numbernode *N, int number_boards)
+{
+	// Verify that all messages in encryptedmsg file can be decoded to match message.
+
+	
+	ifstream encryptedmsg("encryptedmsg", ios::in);
+	ifstream decoderlist("decoderlist", ios::in);
+	
+	struct numbernode *encodedmsg;
+	struct numbernode *decoder;
+	struct numbernode *product;
+
+	char number[16];  // all numbers are 15 digits or less.
+	int j,k;
+
+	int failed=0;
+
+	k=0;
+	while (failed==0 && k<number_boards)
+	{
+		j=0;
+		while(encryptedmsg.get(number[j])&&number[j]!=10)
+			j++;
+		number[j]='\0';
+		encodedmsg=stringtonumber(number);
+
+		j=0;
+		while(decoderlist.get(number[j])&&number[j]!=10)
+			j++;
+		number[j]='\0';
+		decoder=stringtonumber(number);
+
+		product = apowerbmodc(encodedmsg, decoder, N);
+		if (greater(product, message)!=NULL) failed=1;
+		cout << "done decrypting msg " << k << endl;
+		k++;
+		
+	}
+	if (failed==1)
+	{
+		char * charp;
+		cout << endl << "A message failed to be decoded." << endl;
+		cout << "The decoder used was for board # " << (k-1) << endl;
+		charp = stringnum(message);
+		cout << "message was " << charp << endl;
+		delete [] charp;
+		charp = stringnum(product);
+		cout << "remessage was " << charp << endl;
+		delete [] charp;
+	}
+	return;
 }
